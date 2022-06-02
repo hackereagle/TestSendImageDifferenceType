@@ -19,11 +19,8 @@ namespace RORZE
             mMainForm.Connect = new MainForm.delConnect(ConnectServer);
             mMainForm.SendGrabImage = new MainForm.delSendGrabImage(SendGrabImgCmd);
 
-            //mClient = new Client();
-            //mClient.ReplyCommandEvent += new Client.delReplyCommand(ReplyServer);
-            //mClient.ReplyRjCommandEvent += new Client.delReplyRjCommad(ReceiveServerCommand);
             mClient = new ClientAysncReceive();
-            mClient.ReplyRjCommandEvent += new ClientAysncReceive.delReplyRjCommad(ReceiveServerCommand);
+            //mClient.ReplyRjCommandEvent += new ClientAysncReceive.delReplyRjCommad(ReceiveServerCommand);
             mClient.ReplyWithRawDataEvent += new ClientAysncReceive.delReplyWithRawData(ReceiveServerRawData);
 
             IsInfiniteTest = false;
@@ -55,38 +52,6 @@ namespace RORZE
             mClient.SendData(msg);
         }
 
-        // 20210701
-        //private void ReplyServer(string cmd, byte[] data)
-        //{
-        //    if (cmd == "DISP")
-        //    {
-        //        byte[] tmpBufrer;
-        //        // get width and height
-        //        tmpBufrer = new byte[4];
-        //        Array.Copy(data, 0, tmpBufrer, 0, 4);
-        //        int width = BitConverter.ToInt32(tmpBufrer, 0);
-        //        // get width and height
-        //        tmpBufrer = new byte[4];
-        //        Array.Copy(data, 4, tmpBufrer, 0, 4);
-        //        int height = BitConverter.ToInt32(tmpBufrer, 0);
-        //        // get image data
-        //        byte[] imgData = new byte[width * height];
-        //        Array.Copy(data, 8, imgData, 0, width * height);
-
-        //        System.Drawing.Bitmap img = SaveByteArr2Bitmap(data, width, height);
-        //        mRecorder.Record();
-        //        //mMainForm.ShowElapseTime(Convert.ToInt64(mRecorder.ElapseTime));
-        //        mMainForm.ShowInformation(mRecorder.Status);
-        //        img.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
-        //        mMainForm.DisplayImg(img);
-
-        //        if (IsInfiniteTest)
-        //        {
-        //            //System.Threading.Thread.Sleep(5);
-        //            SendGrabImgCmd();
-        //        }
-        //    }
-        //}
         private System.Drawing.Bitmap SaveByteArr2Bitmap(byte[] data, int width, int height)
         {
             System.Drawing.Bitmap img = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
@@ -113,54 +78,38 @@ namespace RORZE
 
         private void ReceiveServerCommand(string cmd, string data)
         {
-            Console.WriteLine($"command:{cmd}, data length = {data.Length}");
-            int firstSplitter = data.IndexOf(',');
-            int secondSplitter = data.Substring(firstSplitter + 1).IndexOf(',');
+            //Console.WriteLine($"command:{cmd}, data length = {data.Length}");
+            //int firstSplitter = data.IndexOf(',');
+            //int secondSplitter = data.Substring(firstSplitter + 1).IndexOf(',');
 
-            int width = Convert.ToInt32(data.Substring(0, firstSplitter));
-            int height = Convert.ToInt32(data.Substring(firstSplitter + 1, secondSplitter));
-            //byte[] imgData = System.Text.Encoding.Default.GetBytes(data.Substring(firstSplitter + 1 + secondSplitter + 1 + 1));
-            byte[] imgData = System.Text.Encoding.ASCII.GetBytes(data.Substring(firstSplitter + 1 + secondSplitter + 1));
-            //byte[] imgData = System.Text.Encoding.ASCII.GetBytes(data.Substring(19));
-            Console.WriteLine($"Image data length = {imgData.Length}");
+            //int width = Convert.ToInt32(data.Substring(0, firstSplitter));
+            //int height = Convert.ToInt32(data.Substring(firstSplitter + 1, secondSplitter));
+            //byte[] imgData = System.Text.Encoding.ASCII.GetBytes(data.Substring(firstSplitter + 1 + secondSplitter + 1));
+            //Console.WriteLine($"Image data length = {imgData.Length}");
 
-            System.Drawing.Bitmap img = SaveByteArr2Bitmap(imgData, width, height);
-            img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
-            //img.Save("Test.bmp");
-            //mMainForm.DisplayImg(img);
+            //System.Drawing.Bitmap img = SaveByteArr2Bitmap(imgData, width, height);
+            //img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
         }
 
         private void ReceiveServerRawData(byte[] rawData)
         {
             Console.WriteLine($"Receive {rawData.Length} byte raw data.");
-            if (rawData.Length > 1000)
-            {
-                string command = System.Text.Encoding.ASCII.GetString(rawData, 0, 100);
-                char header = command[0];
-                string id = command.Substring(1, 4);
-                string cmd = command.Substring(6, 4);
 
-                if ("GRAB" == cmd)
-                {
-                    int dataBeginPos = 11;
-                    string data = command.Substring(dataBeginPos);
+            int total = BitConverter.ToInt32(rawData, 0);
+            byte type = rawData[4];
+            int width = BitConverter.ToInt32(rawData, 5);
+            int height = BitConverter.ToInt32(rawData, 9);
+            int channels = BitConverter.ToInt32(rawData, 13);
+            // get image data
+            byte[] imgData = new byte[width * height];
+            Array.Copy(rawData, 17, imgData, 0, width * height);
 
-                    int firstCommaPos = command.IndexOf(',');
-                    int secondCommaPos = firstCommaPos + command.Substring(firstCommaPos + 1).IndexOf(',') + 1;
+            System.Drawing.Bitmap img = SaveByteArr2Bitmap(imgData, width, height);
+            img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
+            mMainForm.DisplayImg(img);
 
-                    int width = Convert.ToInt32(command.Substring(dataBeginPos, firstCommaPos - dataBeginPos));
-                    int height = Convert.ToInt32(command.Substring(firstCommaPos + 1, secondCommaPos - firstCommaPos -1));
-                    byte[] ImgData = new byte[width * height];
-                    Array.Copy(rawData, secondCommaPos + 1, ImgData, 0, width * height);
-
-                    System.Drawing.Bitmap img = SaveByteArr2Bitmap(ImgData, width, height);
-                    img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
-                    mMainForm.DisplayImg(img);
-
-                    HalconDotNet.HImage himg = ConvertByteArr2HImage(ImgData, width, height);
-                    mMainForm.DisplayImgInHalconSmartWindow(himg);
-                }
-            }
+            HalconDotNet.HImage himg = ConvertByteArr2HImage(imgData, width, height);
+            mMainForm.DisplayImgInHalconSmartWindow(himg);
         }
 
         private HalconDotNet.HImage ConvertByteArr2HImage(byte[] data, int width, int height)

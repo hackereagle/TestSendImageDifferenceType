@@ -20,5 +20,9 @@ namespace RORZE
 
         // Client socket.
         public Socket workSocket = null;
+        // Received data string.  
+        public List<byte[]> RawData = new List<byte[]>();
+        public int TargetLength = 0;
+        public int CurrentLength = 0;
     }
 }

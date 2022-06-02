@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using System.Configuration;
 
 namespace RORZE
 {
@@ -63,32 +67,130 @@ namespace RORZE
                 state.sb.Append(Encoding.ASCII.GetString(state.buffer,
                                                          0,
                                                          bytesRead));
-                byte[] tempData = new byte[bytesRead];
-                Array.Copy(state.buffer, tempData, bytesRead);
-                mRawData.Add(tempData); // 20210703
-                if (server.Available == 0)
+                //byte[] tempData = new byte[bytesRead];
+                //Array.Copy(state.buffer, tempData, bytesRead);
+                //mRawData.Add(tempData); // 20210703
+
+                //if (server.Available == 0)
+                if (true)
                 {
-                    content = state.sb.ToString();
-                    RjProtocolPackageDecoder packageDecoder = new RjProtocolPackageDecoder(content);
-                    Console.WriteLine($"receive command {packageDecoder.Command}, total package length = {content.Length}");
+                    //content = state.sb.ToString();
+                    //RjProtocolPackageDecoder packageDecoder = new RjProtocolPackageDecoder(content);
+                    //Console.WriteLine($"receive command {packageDecoder.Command}, total package length = {content.Length}");
 
-                    if (ReplyRjCommandEvent != null)
-                        ReplyRjCommandEvent(packageDecoder.Command, packageDecoder.Data);
-                    state.sb.Clear();
+                    //if (ReplyRjCommandEvent != null)
+                    //    ReplyRjCommandEvent(packageDecoder.Command, packageDecoder.Data);
+                    //state.sb.Clear();
 
-                    if (ReplyWithRawDataEvent != null)
+                    //if (ReplyWithRawDataEvent != null)
+                    //{
+                    //    byte[] rawData = MarshalRawDataList(mRawData);
+                    //    ReplyWithRawDataEvent(rawData);
+                    //}
+                    //mRawData.Clear();
+
+                    // There  might be more data, so store the data received so far.  
+                    //string receiveData = Encoding.ASCII.GetString(state.buffer, 0, bytesRead);
+                    state.sb.Append(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
+                    byte[] tempData = new byte[bytesRead];
+                    Array.Copy(state.buffer, tempData, bytesRead);
+                    state.RawData.Add(tempData);
+                    state.CurrentLength += bytesRead;
+
+                    //if (handler.Available == 0)
+                    if (true)
                     {
-                        byte[] rawData = MarshalRawDataList(mRawData);
-                        ReplyWithRawDataEvent(rawData);
+                        //string receiveData = state.sb.ToString();
+                        //if (this.mIsGrabbing)
+                        if (true)
+                        {
+                            int totalLen = BitConverter.ToInt32(state.RawData[0], 0);
+                            state.TargetLength = totalLen;
+                            if (state.TargetLength <= state.CurrentLength)
+                            {
+                                IPEndPoint point = server.RemoteEndPoint as IPEndPoint;
+                                string clientIPAndPort = point.Address.ToString() + "/" + point.Port.ToString();
+                                //將IP與接收到的資料傳給present
+                                byte[] rawData = MarshalRawDataList(state.RawData);
+                                while (rawData.Length >= state.TargetLength)
+                                {
+                                    byte[] dataSp0 = new byte[state.TargetLength];
+                                    Array.Copy(rawData, 0, dataSp0, 0, state.TargetLength);
+                                    //BackgroundLogger.AsyncWrite(LogType.Socket, $"=> {clientIPAndPort}, data length = {receiveData.Length}, raw data = {rawData.Length}, package num = {state.RawData.Count}, data = {receiveData}");
+                                    //BackgroundLogger.AsyncWrite(LogType.Socket, $"image data => {clientIPAndPort}, data length = {receiveData.Length}, raw data = {rawData.Length}, package num = {state.RawData.Count}, data = ");
+                                    BackgroundLogger.AsyncWrite(LogType.Socket, $"image data => {clientIPAndPort}, raw data = {rawData.Length}, package num = {state.RawData.Count}, data = ");
+                                    if (ReplyWithRawDataEvent != null)
+                                        ReplyWithRawDataEvent.Invoke(rawData);
+                                    state.sb.Clear();
+                                    state.RawData.Clear();
+
+                                    int remainBytes = rawData.Length - state.TargetLength;
+                                    if (remainBytes > 0)
+                                    {
+                                        byte[] dataSp1 = new byte[remainBytes];
+                                        Array.Copy(rawData, state.TargetLength, dataSp1, 0, remainBytes);
+
+                                        if (dataSp1.Length < 4)
+                                        {
+                                            state.RawData.Add(dataSp1);
+                                            state.CurrentLength = dataSp1.Length;
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            totalLen = BitConverter.ToInt32(dataSp1, 0);
+                                            if (dataSp1.Length >= totalLen)
+                                            {
+                                                //continue for decoding next image...
+                                                rawData = new byte[dataSp1.Length];
+                                                Array.Copy(dataSp1, 0, rawData, 0, dataSp1.Length);
+                                            }
+                                            else
+                                            {
+                                                state.RawData.Add(dataSp1);
+                                                state.CurrentLength = dataSp1.Length;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        state.TargetLength = 0;
+                                        state.CurrentLength = 0;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            string receiveData = state.sb.ToString();
+                            receiveData = state.sb.ToString();
+                            IPEndPoint point = server.RemoteEndPoint as IPEndPoint;
+                            string clientIPAndPort = point.Address.ToString() + "/" + point.Port.ToString();
+
+                            //將IP與接收到的資料傳給present
+                            byte[] rawData = MarshalRawDataList(state.RawData);
+                            BackgroundLogger.AsyncWrite(LogType.Socket, $"=> {clientIPAndPort}, data length = {receiveData.Length}, raw data = {rawData.Length}, package num = {state.RawData.Count}, data = {receiveData}");
+                            if (ReplyWithRawDataEvent != null)
+                                ReplyWithRawDataEvent.Invoke(rawData);
+
+                            state.sb.Clear();
+                            state.RawData.Clear();
+                            state.TargetLength = 0;
+                            state.CurrentLength = 0;
+                        }
                     }
-                    mRawData.Clear();
+
+                    //循環接收資料
+                    server.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
                 }
             }
 
-            server.BeginReceive(state.buffer, 0,
-                                StateObject.BufferSize, 0,
-                                new AsyncCallback(ReceiveCallback),
-                                state);
+            //server.BeginReceive(state.buffer, 0,
+            //                    StateObject.BufferSize, 0,
+            //                    new AsyncCallback(ReceiveCallback),
+            //                    state);
         }
 
         private byte[] MarshalRawDataList(List<byte[]> rawDataList)

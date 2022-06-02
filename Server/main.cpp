@@ -7,6 +7,7 @@ typedef struct
 {
     int width = 0;
     int height = 0;
+    int channels = 0;
     unsigned char *data = nullptr;
 }RorzeImage;
 
@@ -38,6 +39,9 @@ RorzeImage* MockGrabImage()
     // extract image height and width from header
     memcpy(&img->width, info + 18, sizeof(int));
     memcpy(&img->height, info + 22, sizeof(int));
+    short bits = 0;
+    memcpy(&bits, info + 28, sizeof(short));
+    img->channels = bits / 8;
 
     bool isReverse = true;
     if(img->height < 0){
@@ -78,22 +82,35 @@ int main(int argc, const char* argv[])
         else if(command == std::string("Test")){
             RorzeImage* img = nullptr;
             img = MockGrabImage();
-            std::string header = "aAOI1";
+            #pragma pack(push)
+            #pragma pack(1)
+            struct img_hdr
+            {
+                int total;
+                unsigned char type;
+                int w, h, channels;
+            };
+            #pragma pack(pop)
+            std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
+            int len = img->width * img->height * img->channels + sizeof(struct img_hdr);
 
-            char temp[100];
-            sprintf(temp, "%s.GRAB:%d,%d,", header.c_str(), img->width, img->height);
-            std::string _temp = std::string(temp);
+            char* buff = new char[len + (1 << 5)];
+            memset(buff, 0, len);
+            struct img_hdr* hdr = (struct img_hdr*)buff;
+            std::cout << "start address = " << hdr << std::endl;
+            hdr->total = len;
+            hdr->type = 0;
+            hdr->w = img->width;
+            hdr->h = img->height;
+            hdr->channels = img->channels;
+            unsigned char* payload = (unsigned char*)(hdr + 1);
+            std::cout << "image data address = " << payload << std::endl;
+            memcpy(payload, img->data, img->width * img->height * img->channels);
 
-            int len = _temp.size() + (img->width * img->height);
-            char* package = new char[len];
-            memcpy(package, _temp.c_str(), _temp.size());
-            memcpy(package + _temp.size(), img->data, img->width * img->height);
-
-            if(server->SendData(package, len)){
+            if(server->SendData(buff, len)){
                 std::cout << "Send sucess" << std::endl;
                 std::cout << "\tTotal length = " << len
-                          << "\n\tTotal Command length = " << _temp.size()
-                          << "\n\tData length = " << img->width * img->height
+                          << "\n\tData length = " << img->width * img->height * img->channels
                           << std::endl;
             }
             else
