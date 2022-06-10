@@ -100,16 +100,32 @@ namespace RORZE
             int width = BitConverter.ToInt32(rawData, 5);
             int height = BitConverter.ToInt32(rawData, 9);
             int channels = BitConverter.ToInt32(rawData, 13);
-            // get image data
-            byte[] imgData = new byte[width * height];
-            Array.Copy(rawData, 17, imgData, 0, width * height);
 
-            System.Drawing.Bitmap img = SaveByteArr2Bitmap(imgData, width, height);
-            img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
-            mMainForm.DisplayImg(img);
+            if (0 == type)
+            {
+                // get image data
+                byte[] imgData = new byte[width * height];
+                Array.Copy(rawData, 17, imgData, 0, width * height);
 
-            HalconDotNet.HImage himg = ConvertByteArr2HImage(imgData, width, height);
-            mMainForm.DisplayImgInHalconSmartWindow(himg);
+                System.Drawing.Bitmap img = SaveByteArr2Bitmap(imgData, width, height);
+                img.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
+                mMainForm.DisplayImg(img);
+
+                HalconDotNet.HImage himg = ConvertByteArr2HImage(imgData, width, height);
+                mMainForm.DisplayImgInHalconSmartWindow(himg);
+            }
+            else
+            {
+                int imgDataLen = total - 17;
+                byte[] imgData = new byte[imgDataLen];
+                Array.Copy(rawData, 17, imgData, 0, imgDataLen);
+                System.Drawing.Bitmap img;
+                using (System.IO.MemoryStream ms = new System.IO.MemoryStream(imgData))
+                {
+                    img = new System.Drawing.Bitmap(ms);
+                    mMainForm.DisplayImg(img);
+                }
+            }
         }
 
         private HalconDotNet.HImage ConvertByteArr2HImage(byte[] data, int width, int height)

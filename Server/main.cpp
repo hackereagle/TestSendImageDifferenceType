@@ -16,13 +16,6 @@ typedef struct
 }RorzeImage;
 
 // JPEG
-typedef struct CLibImageStruct {
-	int iWidth , iHeight , iChannel ;
-	void *vPtrImage ;
-} CLibImage ;
-
-typedef CLibImage* HCLIBIMAGE;
-
 #ifdef _WIN32
 #define CLibMalloc(a) _aligned_malloc(a , 16)
 #else
@@ -32,10 +25,6 @@ typedef CLibImage* HCLIBIMAGE;
 
 inline void* EncodeImageToJpegByteStream(const RorzeImage* img, const int q, unsigned long &output_length)
 {
-	// if (IsEmptyImage(img))
-	// {
-	// 	return NULL;
-	// }
 	int quality = q;
 
 	/* This struct contains the JPEG decompression parameters and pointers to
@@ -218,44 +207,45 @@ int main(int argc, const char* argv[])
         else if(command == std::string("TestJpeg")){
             RorzeImage* img = nullptr;
             img = MockGrabImage();
-            unsigned long len = 0;
+            unsigned long jpegDataLen = 0;
             TimeCounter::GetInstance().SetStartCountPoint();
-            char* jpegData = (char*)EncodeImageToJpegByteStream(img, 60, len);
-            std::cout << "elapsed time = " << TimeCounter::GetInstance().GetElapsedTime() << "ms, data length = " << len << std::endl;
-            // #pragma pack(push)
-            // #pragma pack(1)
-            // struct img_hdr
-            // {
-            //     int total;
-            //     unsigned char type;
-            //     int w, h, channels;
-            // };
-            // #pragma pack(pop)
-            // std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
-            // int len = img->width * img->height * img->channels + sizeof(struct img_hdr);
+            char* jpegData = (char*)EncodeImageToJpegByteStream(img, 60, jpegDataLen);
+            std::cout << "elapsed time = " << TimeCounter::GetInstance().GetElapsedTime() << "ms, data length = " << jpegDataLen << std::endl;
 
-            // char* buff = new char[len];
-            // memset(buff, 0, len);
-            // struct img_hdr* hdr = (struct img_hdr*)buff;
-            // std::cout << "start address = " << hdr << std::endl;
-            // hdr->total = len;
-            // hdr->type = 0;
-            // hdr->w = img->width;
-            // hdr->h = img->height;
-            // hdr->channels = img->channels;
-            // unsigned char* payload = (unsigned char*)(hdr + 1);
-            // std::cout << "image data address = " << payload << std::endl;
-            // //memcpy(payload, img->data, img->width * img->height * img->channels);
+            #pragma pack(push)
+            #pragma pack(1)
+            struct img_hdr
+            {
+                int total;
+                unsigned char type;
+                int w, h, channels;
+            };
+            #pragma pack(pop)
+            std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
+            int len = jpegDataLen + sizeof(struct img_hdr);
 
-            // if(server->SendData(buff, len)){
-            //     std::cout << "Send sucess" << std::endl;
-            //     std::cout << "\tTotal length = " << len
-            //               << "\n\tData length = " << img->width * img->height * img->channels
-            //               << std::endl;
-            // }
-            // else
-            //     std::cout << "Send fail" << std::endl;
-            // delete [] buff;
+            char* buff = new char[len];
+            memset(buff, 0, len);
+            struct img_hdr* hdr = (struct img_hdr*)buff;
+            std::cout << "start address = " << hdr << std::endl;
+            hdr->total = len;
+            hdr->type = 1;
+            hdr->w = img->width;
+            hdr->h = img->height;
+            hdr->channels = img->channels;
+            unsigned char* payload = (unsigned char*)(hdr + 1);
+            std::cout << "image data address = " << payload << std::endl;
+            memcpy(payload, jpegData, jpegDataLen);
+
+            if(server->SendData(buff, len)){
+                std::cout << "Send sucess" << std::endl;
+                std::cout << "\tTotal length = " << len
+                          << "\n\tData length = " << img->width * img->height * img->channels
+                          << std::endl;
+            }
+            else
+                std::cout << "Send fail" << std::endl;
+            delete [] buff;
         }
         else{
             std::cout << "type: " << command << std::endl;
