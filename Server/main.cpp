@@ -240,12 +240,12 @@ int main(int argc, const char* argv[])
             if(server->SendData(buff, len)){
                 std::cout << "Send sucess" << std::endl;
                 std::cout << "\tTotal length = " << len
-                          << "\n\tData length = " << img->width * img->height * img->channels
                           << std::endl;
             }
             else
                 std::cout << "Send fail" << std::endl;
             delete [] buff;
+            free(jpegData);
         }
         else{
             std::cout << "type: " << command << std::endl;
