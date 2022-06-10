@@ -1,9 +1,9 @@
 #include <iostream>
 #include <memory>
 #include <string>
-extern "C"{
+// extern "C"{
 #include "jpeglib.h"
-}
+// }
 #include "TcpServer.h"
 #include "TimeCounter.h"
 
