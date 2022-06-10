@@ -1,10 +1,11 @@
 #include <iostream>
-#include "TcpServer.h"
 #include <memory>
 #include <string>
 extern "C"{
 #include "jpeglib.h"
 }
+#include "TcpServer.h"
+#include "TimeCounter.h"
 
 typedef struct 
 {
@@ -29,7 +30,7 @@ typedef CLibImage* HCLIBIMAGE;
 #define CLibMalloc(a) aligned_alloc(16 , a)
 #endif
 
-inline void* EncodeImageToJpegByteStream(const HCLIBIMAGE img, const int q, unsigned long &output_length)
+inline void* EncodeImageToJpegByteStream(const RorzeImage* img, const int q, unsigned long &output_length)
 {
 	// if (IsEmptyImage(img))
 	// {
@@ -54,35 +55,35 @@ inline void* EncodeImageToJpegByteStream(const HCLIBIMAGE img, const int q, unsi
 	//jpeg_stdio_dest(&cinfo, outfile);
 	/* We set up the normal JPEG error routines, then override error_exit. */
 	cinfo.err = jpeg_std_error(&pub);
-	cinfo.image_height = img->iHeight;
-	cinfo.image_width = img->iWidth;
-	cinfo.input_components = img->iChannel == 4 ? 3 : img->iChannel;
+	cinfo.image_height = img->height;
+	cinfo.image_width = img->width;
+	cinfo.input_components = img->channels == 4 ? 3 : img->channels;
 
-	if (img->iChannel == 1) {
+	if (img->channels == 1) {
 		cinfo.in_color_space = J_COLOR_SPACE::JCS_GRAYSCALE;
 	}
-	else if (img->iChannel == 3 || img->iChannel == 4) {
+	else if (img->channels == 3 || img->channels == 4) {
 		cinfo.in_color_space = J_COLOR_SPACE::JCS_RGB;
 	}
 
 	jpeg_set_defaults(&cinfo);
 	jpeg_set_quality(&cinfo, quality, TRUE);
-	BYTE *rowData = (BYTE *)malloc(sizeof(BYTE) * img->iWidth * cinfo.input_components);
+	BYTE *rowData = (BYTE *)malloc(sizeof(BYTE) * img->width * cinfo.input_components);
 
 	jpeg_start_compress(&cinfo, TRUE);
-	row_stride = img->iWidth * img->iChannel;
+	row_stride = img->width * img->channels;
 
 	bool succ = true;
 
 
-	while (cinfo.next_scanline < img->iHeight) {
-		BYTE* buffer = ((BYTE *)img->vPtrImage) + row_stride * cinfo.next_scanline;
-		if (img->iChannel == 4 || img->iChannel == 3) {
+	while (cinfo.next_scanline < img->height) {
+		BYTE* buffer = ((BYTE *)img->data) + row_stride * cinfo.next_scanline;
+		if (img->channels == 4 || img->channels == 3) {
 			//shrink to 3 channels
-			for (int j = 0; j < img->iWidth; ++j) {
-				rowData[j * 3] = buffer[j * img->iChannel + 2];
-				rowData[j * 3 + 1] = buffer[j * img->iChannel + 1];
-				rowData[j * 3 + 2] = buffer[j * img->iChannel + 0];
+			for (int j = 0; j < img->width; ++j) {
+				rowData[j * 3] = buffer[j * img->channels + 2];
+				rowData[j * 3 + 1] = buffer[j * img->channels + 1];
+				rowData[j * 3 + 2] = buffer[j * img->channels + 0];
 			}
 		}
 		else {
@@ -217,40 +218,44 @@ int main(int argc, const char* argv[])
         else if(command == std::string("TestJpeg")){
             RorzeImage* img = nullptr;
             img = MockGrabImage();
-            #pragma pack(push)
-            #pragma pack(1)
-            struct img_hdr
-            {
-                int total;
-                unsigned char type;
-                int w, h, channels;
-            };
-            #pragma pack(pop)
-            std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
-            int len = img->width * img->height * img->channels + sizeof(struct img_hdr);
+            unsigned long len = 0;
+            TimeCounter::GetInstance().SetStartCountPoint();
+            char* jpegData = (char*)EncodeImageToJpegByteStream(img, 60, len);
+            std::cout << "elapsed time = " << TimeCounter::GetInstance().GetElapsedTime() << "ms, data length = " << len << std::endl;
+            // #pragma pack(push)
+            // #pragma pack(1)
+            // struct img_hdr
+            // {
+            //     int total;
+            //     unsigned char type;
+            //     int w, h, channels;
+            // };
+            // #pragma pack(pop)
+            // std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
+            // int len = img->width * img->height * img->channels + sizeof(struct img_hdr);
 
-            char* buff = new char[len];
-            memset(buff, 0, len);
-            struct img_hdr* hdr = (struct img_hdr*)buff;
-            std::cout << "start address = " << hdr << std::endl;
-            hdr->total = len;
-            hdr->type = 0;
-            hdr->w = img->width;
-            hdr->h = img->height;
-            hdr->channels = img->channels;
-            unsigned char* payload = (unsigned char*)(hdr + 1);
-            std::cout << "image data address = " << payload << std::endl;
-            //memcpy(payload, img->data, img->width * img->height * img->channels);
+            // char* buff = new char[len];
+            // memset(buff, 0, len);
+            // struct img_hdr* hdr = (struct img_hdr*)buff;
+            // std::cout << "start address = " << hdr << std::endl;
+            // hdr->total = len;
+            // hdr->type = 0;
+            // hdr->w = img->width;
+            // hdr->h = img->height;
+            // hdr->channels = img->channels;
+            // unsigned char* payload = (unsigned char*)(hdr + 1);
+            // std::cout << "image data address = " << payload << std::endl;
+            // //memcpy(payload, img->data, img->width * img->height * img->channels);
 
-            if(server->SendData(buff, len)){
-                std::cout << "Send sucess" << std::endl;
-                std::cout << "\tTotal length = " << len
-                          << "\n\tData length = " << img->width * img->height * img->channels
-                          << std::endl;
-            }
-            else
-                std::cout << "Send fail" << std::endl;
-            delete [] buff;
+            // if(server->SendData(buff, len)){
+            //     std::cout << "Send sucess" << std::endl;
+            //     std::cout << "\tTotal length = " << len
+            //               << "\n\tData length = " << img->width * img->height * img->channels
+            //               << std::endl;
+            // }
+            // else
+            //     std::cout << "Send fail" << std::endl;
+            // delete [] buff;
         }
         else{
             std::cout << "type: " << command << std::endl;
