@@ -61,16 +61,6 @@
                 "cwd": "${workspaceFolder}"
             }
         },
-        // {
-        //     "label": "Rebuild project(Debug)",
-        //     "type": "shell",
-        //     "command": "rm -r build; mkdir build; time -p cmake -E chdir build/ cmake -DCMAKE_BUILD_TYPE=Debug ..; cd build; time -p make -j4; cd ..",
-        //     "problemMatcher": [],
-        //     "group": "build",
-        //     "options": {
-        //         "cwd": "${workspaceFolder}"
-        //     }
-        // },
         {
             "label": "Re-configure Project(Debug)",
             "type": "shell",

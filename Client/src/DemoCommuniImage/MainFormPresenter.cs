@@ -93,7 +93,7 @@ namespace RORZE
 
         private void ReceiveServerRawData(byte[] rawData)
         {
-            Console.WriteLine($"Receive {rawData.Length} byte raw data.");
+            Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss.fff")} Receive {rawData.Length} byte raw data.");
 
             int total = BitConverter.ToInt32(rawData, 0);
             byte type = rawData[4];
@@ -126,6 +126,7 @@ namespace RORZE
                     mMainForm.DisplayImg(img);
                 }
             }
+            Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss.fff")} finished convert.");
         }
 
         private HalconDotNet.HImage ConvertByteArr2HImage(byte[] data, int width, int height)

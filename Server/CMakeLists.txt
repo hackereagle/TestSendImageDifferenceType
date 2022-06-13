@@ -19,4 +19,5 @@ target_link_libraries(${PROJ_NAME} ${CMAKE_DL_LIBS} Threads::Threads jpeg)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_STANDARD 17)
+# set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")

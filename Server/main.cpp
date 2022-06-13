@@ -1,11 +1,10 @@
 #include <iostream>
 #include <memory>
 #include <string>
-// extern "C"{
 #include "jpeglib.h"
-// }
 #include "TcpServer.h"
 #include "TimeCounter.h"
+#include "DateTime.h"
 
 typedef struct 
 {
@@ -184,14 +183,14 @@ int main(int argc, const char* argv[])
             char* buff = new char[len];
             memset(buff, 0, len);
             struct img_hdr* hdr = (struct img_hdr*)buff;
-            std::cout << "start address = " << hdr << std::endl;
+            std::cout << "start address = " << (void*)hdr << std::endl;
             hdr->total = len;
             hdr->type = 0;
             hdr->w = img->width;
             hdr->h = img->height;
             hdr->channels = img->channels;
             unsigned char* payload = (unsigned char*)(hdr + 1);
-            std::cout << "image data address = " << payload << std::endl;
+            std::cout << "image data address = " << (void*)payload << std::endl;
             memcpy(payload, img->data, img->width * img->height * img->channels);
 
             if(server->SendData(buff, len)){
@@ -227,16 +226,18 @@ int main(int argc, const char* argv[])
             char* buff = new char[len];
             memset(buff, 0, len);
             struct img_hdr* hdr = (struct img_hdr*)buff;
-            std::cout << "start address = " << hdr << std::endl;
+            std::cout << "start address = " << (void*)hdr << std::endl;
             hdr->total = len;
             hdr->type = 1;
             hdr->w = img->width;
             hdr->h = img->height;
             hdr->channels = img->channels;
             unsigned char* payload = (unsigned char*)(hdr + 1);
-            std::cout << "image data address = " << payload << std::endl;
+            std::cout << "image data address = " << (void*)payload << std::endl;
             memcpy(payload, jpegData, jpegDataLen);
 
+            DateTime now;
+            std::cout << "Begin send " << now.GetHour() << ":" << now.GetMinute() << ":" << now.GetSecond() << "." << now.GetMillisecond() << std::endl;
             if(server->SendData(buff, len)){
                 std::cout << "Send sucess" << std::endl;
                 std::cout << "\tTotal length = " << len
