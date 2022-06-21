@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.4)
 project(TestSendImage)
 set(PROJ_NAME TestSendImage)
+
+add_compile_definitions(SRC_PATH="${CMAKE_SOURCE_DIR}")
+message(STATUS "SRC_PATH=${SRC_PATH}")
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 

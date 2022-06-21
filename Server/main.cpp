@@ -6,6 +6,12 @@
 #include "TimeCounter.h"
 #include "DateTime.h"
 
+#ifdef SRC_PATH
+    #define TESTING_IMG_PATH SRC_PATH"/../ProjectDocs/"
+#else
+    #define TESTING_IMG_PATH "../../../../ProjectDocs/"
+#endif
+
 typedef struct 
 {
     int width = 0;
@@ -111,11 +117,14 @@ RorzeImage* MockGrabImage()
     memset(img, 0, sizeof(RorzeImage));
 
     int i;
-    FILE* f = fopen("/mnt/e/hacker_station_of_SC/project/TestingImage/lena_gray.bmp", "rb");
+    //FILE* f = fopen("/mnt/e/hacker_station_of_SC/project/TestingImage/lena_gray.bmp", "rb");
+    std::string imgName = std::string(TESTING_IMG_PATH) + "lena_gray.bmp";
+    FILE* f = fopen(imgName.c_str(), "rb");
     if(!f){
         std::cout << "\n\ncan not open file!" << std::endl;
         img->width = 512;
         img->height = 512;
+        img->channels = 1;
         img->data = new unsigned char[img->width * img->height];
         return img;
     }
@@ -153,6 +162,72 @@ RorzeImage* MockGrabImage()
 
 }
 
+enum class SendImgFormat
+{
+	BMP,
+	JPEG,
+};
+
+inline bool SendImage(TcpServer* imgServer, RorzeImage* img, SendImgFormat format = SendImgFormat::BMP, int quality = 60)
+{
+	bool ret = false;
+
+	#pragma pack(push)
+	#pragma pack(1)
+	struct img_hdr
+	{
+		int total;
+		unsigned char type;
+		int w, h, channels;
+	};
+	#pragma pack(pop)
+
+	// variables which sending image needed
+	int len = 0;
+	char* imgData = nullptr;
+	int imgDataLen = 0;
+	int imgFmt = 0;
+
+	// Begin orgnizing data
+	if(SendImgFormat::JPEG == format){
+		unsigned long jpegDataLen = 0;
+		TimeCounter::GetInstance().SetStartCountPoint();
+		imgData = (char*)EncodeImageToJpegByteStream(img, quality, jpegDataLen);
+		std::cout << "compress to jpeg elapsed time = " << TimeCounter::GetInstance().GetElapsedTime() << "ms, data length = " << jpegDataLen << std::endl;
+
+		imgDataLen = static_cast<int>(jpegDataLen);
+		imgFmt = 1;
+	}
+	else{
+		imgDataLen = img->width * img->height * img->channels;
+		//imgData = new char[imgDataLen];
+		imgData = (char*)malloc(imgDataLen);
+		memcpy(imgData, img->data, imgDataLen);
+		imgFmt = 0;
+	}
+	len = imgDataLen + sizeof(struct img_hdr);
+
+	char* buff = new char[len];
+	memset(buff, 0, len);
+	struct img_hdr* hdr = (struct img_hdr*)buff;
+	std::cout << "start address = " << hdr << std::endl;
+	hdr->total = len;
+	hdr->type = imgFmt;
+	hdr->w = img->width;
+	hdr->h = img->height;
+	hdr->channels = img->channels;
+	unsigned char* payload = (unsigned char*)(hdr + 1);
+	memcpy(payload, imgData, imgDataLen);
+
+	ret = imgServer->SendData(buff, len);
+
+	delete [] buff;
+	if(imgData)
+		free(imgData);
+
+	return ret;
+}
+
 int main(int argc, const char* argv[])
 {
     TcpServer *server = new TcpServer();
@@ -168,85 +243,22 @@ int main(int argc, const char* argv[])
         else if(command == std::string("Test")){
             RorzeImage* img = nullptr;
             img = MockGrabImage();
-            #pragma pack(push)
-            #pragma pack(1)
-            struct img_hdr
-            {
-                int total;
-                unsigned char type;
-                int w, h, channels;
-            };
-            #pragma pack(pop)
-            std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
-            int len = img->width * img->height * img->channels + sizeof(struct img_hdr);
+            SendImage(server, img);
 
-            char* buff = new char[len];
-            memset(buff, 0, len);
-            struct img_hdr* hdr = (struct img_hdr*)buff;
-            std::cout << "start address = " << (void*)hdr << std::endl;
-            hdr->total = len;
-            hdr->type = 0;
-            hdr->w = img->width;
-            hdr->h = img->height;
-            hdr->channels = img->channels;
-            unsigned char* payload = (unsigned char*)(hdr + 1);
-            std::cout << "image data address = " << (void*)payload << std::endl;
-            memcpy(payload, img->data, img->width * img->height * img->channels);
-
-            if(server->SendData(buff, len)){
-                std::cout << "Send sucess" << std::endl;
-                std::cout << "\tTotal length = " << len
-                          << "\n\tData length = " << img->width * img->height * img->channels
-                          << std::endl;
+            if(img){
+                delete [] img->data;
+                delete img;
             }
-            else
-                std::cout << "Send fail" << std::endl;
-            delete [] buff;
         }
         else if(command == std::string("TestJpeg")){
             RorzeImage* img = nullptr;
             img = MockGrabImage();
-            unsigned long jpegDataLen = 0;
-            TimeCounter::GetInstance().SetStartCountPoint();
-            char* jpegData = (char*)EncodeImageToJpegByteStream(img, 60, jpegDataLen);
-            std::cout << "elapsed time = " << TimeCounter::GetInstance().GetElapsedTime() << "ms, data length = " << jpegDataLen << std::endl;
+            SendImage(server, img, SendImgFormat::JPEG, 60);
 
-            #pragma pack(push)
-            #pragma pack(1)
-            struct img_hdr
-            {
-                int total;
-                unsigned char type;
-                int w, h, channels;
-            };
-            #pragma pack(pop)
-            std::cout << "img_hdr size = " << sizeof(img_hdr) << std::endl;
-            int len = jpegDataLen + sizeof(struct img_hdr);
-
-            char* buff = new char[len];
-            memset(buff, 0, len);
-            struct img_hdr* hdr = (struct img_hdr*)buff;
-            std::cout << "start address = " << (void*)hdr << std::endl;
-            hdr->total = len;
-            hdr->type = 1;
-            hdr->w = img->width;
-            hdr->h = img->height;
-            hdr->channels = img->channels;
-            unsigned char* payload = (unsigned char*)(hdr + 1);
-            std::cout << "image data address = " << (void*)payload << std::endl;
-            memcpy(payload, jpegData, jpegDataLen);
-
-            DateTime now;
-            std::cout << "Begin send " << now.GetHour() << ":" << now.GetMinute() << ":" << now.GetSecond() << "." << now.GetMillisecond() << std::endl;
-            if(server->SendData(buff, len)){
-                std::cout << "Send sucess" << std::endl;
-                std::cout << "\tTotal length = " << len
-                          << std::endl;
+            if(img){
+                delete [] img->data;
+                delete img;
             }
-            else
-                std::cout << "Send fail" << std::endl;
-            delete [] buff;
-            free(jpegData);
         }
         else{
             std::cout << "type: " << command << std::endl;
